@@ -14,19 +14,24 @@ void print_usage(char *argv[]) {
     printf("\t -f - path to DB file\n");
     printf("\t -a - add employee to database\n");
     printf("\t -l - list employees\n");
+    printf("\t -r - <name> remove employee from database\n");
+    printf("\t -u - <name,hours> update employee hours\n");
 }
 
 int main(int argc, char *argv[]) { 
     bool newfile = false;
+    bool listemployees = false;
     char *filepath = NULL;
     char *addstring = NULL;
+    char *removeemployee = NULL;
+    char *updateemployee = NULL;
     int c;
 
     int dbfd = -1;
     struct dbheader_t *dbheader = NULL;
     struct employee_t *employees = NULL;
 
-    while ((c = getopt(argc, argv, "nf:a:")) != -1) {
+    while ((c = getopt(argc, argv, "nf:a:lr:u:")) != -1) {
         switch (c) {
             case 'n':
                 newfile = true;
@@ -37,6 +42,15 @@ int main(int argc, char *argv[]) {
             case 'a':
                 addstring = optarg;
                 break;
+            case 'l':
+                listemployees = true;
+            break;
+            case 'r':
+                removeemployee = optarg;
+            break;
+            case 'u':
+                updateemployee = optarg;
+            break;
             case '?':
                 printf("Unexpected option -%c\n", c);
                 break;
@@ -69,6 +83,7 @@ int main(int argc, char *argv[]) {
         }
         if (validate_db_header(dbfd, &dbheader) == STATUS_ERROR) {
             printf("Failed to validate DB header\n");
+            close_db_file(dbfd);
             return -1;
         }
 
@@ -80,14 +95,28 @@ int main(int argc, char *argv[]) {
 
     if ((read_employees(dbfd, dbheader, &employees)) != STATUS_SUCCESS) {
         printf("Failed reading employees data from the DB\n");
+        close_db_file(dbfd);
         return 0;
     }
 
     if (addstring != NULL) {
         add_employee(dbheader, &employees, addstring);
     }
+    
+    if (removeemployee != NULL) {
+        remove_employee(dbheader, employees, removeemployee);
+    }
+    
+    if (updateemployee != NULL) {
+        update_employee(dbheader, employees, updateemployee);
+    }
+
+    if (listemployees) {
+        list_employees(dbheader, employees);
+    }
 
     output_file(dbfd, dbheader, employees);
 
+    close_db_file(dbfd);
     return 0;
 }

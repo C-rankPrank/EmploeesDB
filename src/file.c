@@ -39,4 +39,8 @@ int open_db_file(char *filename) {
     return fd; 
 }
 
+void close_db_file(int fd) {
+    close(fd);
+}
+
 

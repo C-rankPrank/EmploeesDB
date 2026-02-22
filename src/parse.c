@@ -37,6 +37,16 @@ int read_employees(int fd, struct dbheader_t *dbhdr, struct employee_t **employe
     return STATUS_SUCCESS;
 }
 
+void list_employees(struct dbheader_t *dbhdr, struct employee_t *employees) {
+    if((NULL == dbhdr) || (NULL == employees)) return;
+    for (int i = 0; i < dbhdr->count; i++) {
+        printf("Employee: %d\n\tName:\t%s\n\tAdress:\t%s\n\tHours:\t%d\n",  i,
+                                                                            employees[i].name,
+                                                                            employees[i].address,
+                                                                            employees[i].hours);
+    }
+}
+
 int add_employee(struct dbheader_t *dbhdr, struct employee_t **employees, char *addstring) {
     if ((dbhdr == NULL) ||
         (employees == NULL) ||
@@ -61,17 +71,82 @@ int add_employee(struct dbheader_t *dbhdr, struct employee_t **employees, char *
         }
         *employees = e;
         
-        
         dbhdr->count++;
+
         /* sizeof() -1 because to leave room for \0 */
         strncpy(e[dbhdr->count-1].name, name, sizeof(e[dbhdr->count-1].name)-1);
+        e[dbhdr->count-1].name[sizeof(e[dbhdr->count-1].name)-1] = '\0';
         strncpy(e[dbhdr->count-1].address, address, sizeof(e[dbhdr->count-1].address)-1);
+        e[dbhdr->count-1].address[sizeof(e[dbhdr->count-1].name)-1] = '\0';
         e[dbhdr->count-1].hours = atoi(hours);
         
         name = strtok(NULL, ",");
     }  
 
     return STATUS_SUCCESS;
+}
+
+int remove_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *remvoestring) {
+    if ((dbhdr == NULL) ||
+        (employees == NULL) ||
+        (remvoestring == NULL)) {
+        printf("Failed to delete employee\n");
+        return STATUS_ERROR;
+    }
+
+    if (dbhdr->count == 0) return STATUS_ERROR;
+
+    int found_index = -1;
+
+    char *name = strtok(remvoestring, ",");
+    if (name == NULL) return STATUS_ERROR;
+
+    for (int i = 0; i < dbhdr->count; i++) {
+        if(strcmp(name, employees[i].name) == 0){
+            found_index = i;
+        }
+    }
+    
+    if (found_index < 0) {
+        printf("No %s employee found in DB to be removed\n", name);
+        return STATUS_ERROR;
+    }
+    memset(&employees[found_index], 0, sizeof(struct employee_t));
+    printf("Employee %s at index %d deleted\n", name, found_index);
+    if (dbhdr->count-1 > found_index) {
+        memmove(&employees[found_index],
+                &employees[dbhdr->count-1],
+                sizeof(struct employee_t));
+    }
+
+    dbhdr->count--;
+    return STATUS_SUCCESS;
+}
+
+
+
+int update_employee(struct dbheader_t *dbhdr, struct employee_t *employees, char *updatestring) {
+    if ((dbhdr == NULL) ||
+        (employees == NULL) ||
+        (updatestring == NULL)) {
+        printf("Failed to update employee\n");
+        return STATUS_ERROR;
+    }
+
+    char *name = strtok(updatestring, ",");
+    if (name == NULL) return STATUS_ERROR;
+    char *hours = strtok(NULL, ",");
+    if (hours == NULL) return STATUS_ERROR;
+
+    for (int i = 0; i < dbhdr->count; i++) {
+        if(strcmp(name, employees[i].name) == 0){
+            printf("Found %s to update at index %d\n", name, i);
+            employees[i].hours = atoi(hours);
+            return STATUS_SUCCESS;
+        }
+    }
+    
+    return STATUS_ERROR;
 }
 
 int output_file(int fd, struct dbheader_t *dbhdr, struct employee_t *employees) {
@@ -101,8 +176,12 @@ int output_file(int fd, struct dbheader_t *dbhdr, struct employee_t *employees) 
         write(fd, &employees[i], sizeof(struct employee_t));
     }
 
-    return 0;
+    if (ftruncate(fd, ntohl(dbhdr->filesize)) == -1) {
+        perror("Failed to shrink the file");
+        return STATUS_ERROR;
+    }
 
+    return 0;
 }	
 
 int validate_db_header(int fd, struct dbheader_t **headerOut) {
